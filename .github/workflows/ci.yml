@@ -38,8 +38,9 @@ jobs:
           HEALTH_DEVICES_BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # The debug APK of every run, for installing a branch on a phone before it
-      # is merged. Signed with the nightly test certificate, so it installs over
-      # the previous branch APK and over a nightly build.
+      # is merged. It is signed with the runner's debug key, not the nightly
+      # key: to install it over a nightly build (or an earlier branch APK),
+      # uninstall that build first.
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:

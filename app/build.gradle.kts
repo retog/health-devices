@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,12 +5,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// CI and nightly builds are signed with a checked-in, non-secret test
-// certificate (see keystore/README.md) so consecutive APKs share a signature
-// and can be installed over one another. This is not a production signing key.
-val nightlyKeystoreProperties = Properties().apply {
-    file("../keystore/nightly-test.properties").inputStream().use { load(it) }
-}
+// Nightly builds (-Pnightly) are signed with the nightly key so consecutive
+// nightly APKs share a signature and can be installed over one another. The
+// key is not in the repository: the nightly workflow decodes it from
+// repository secrets and passes it in through NIGHTLY_* environment variables
+// (see "Nightly builds" in README.md). Other release builds stay unsigned.
+val nightly = project.hasProperty("nightly")
+
+fun nightlySigning(name: String): String =
+    providers.environmentVariable(name).orNull
+        ?: throw GradleException("-Pnightly needs the environment variable $name (see \"Nightly builds\" in README.md)")
 
 android {
     namespace = "com.farewellutopia.healthdevices"
@@ -40,29 +42,31 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        create("nightly") {
-            storeFile = file("../keystore/${nightlyKeystoreProperties.getProperty("storeFile")}")
-            storePassword = nightlyKeystoreProperties.getProperty("storePassword")
-            keyAlias = nightlyKeystoreProperties.getProperty("keyAlias")
-            keyPassword = nightlyKeystoreProperties.getProperty("keyPassword")
+    if (nightly) {
+        signingConfigs {
+            create("nightly") {
+                // A relative path is taken from the repository root.
+                storeFile = rootProject.file(nightlySigning("NIGHTLY_KEYSTORE_FILE"))
+                storePassword = nightlySigning("NIGHTLY_KEYSTORE_PASSWORD")
+                keyAlias = nightlySigning("NIGHTLY_KEY_ALIAS")
+                // A PKCS12 keystore has one password for the store and its key.
+                keyPassword = nightlySigning("NIGHTLY_KEYSTORE_PASSWORD")
+            }
         }
     }
 
+    // Debug builds keep the default debug signing, so CI's assembleDebug needs
+    // no secrets.
     buildTypes {
-        // Debug builds share the test certificate too: each CI runner would
-        // otherwise sign with a fresh debug key, and Android refuses to install
-        // one branch APK over the previous one ("App not installed").
-        debug {
-            signingConfig = signingConfigs.getByName("nightly")
-        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("nightly")
+            if (nightly) {
+                signingConfig = signingConfigs.getByName("nightly")
+            }
         }
     }
 
