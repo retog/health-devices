@@ -2,12 +2,14 @@ package com.farewellutopia.healthdevices.service
 
 import android.Manifest
 import android.app.Service
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -123,13 +125,27 @@ class ReadingService : Service() {
             return
         }
         val remote = adapter.getRemoteDevice(address)
-        val outcome = withTimeoutOrNull(GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS) {
-            GattSession(this@ReadingService, remote, profile, GattSession.BACKGROUND_TIMEOUT_MS).run()
-        } ?: ReadOutcome(emptyList(), failure = ReadFailure.TIMEOUT)
+        if (device.bonded && remote.bondState != BluetoothDevice.BOND_BONDED) {
+            // The CCCD write would make Android ask for pairing, with nobody in front to answer.
+            report(device, ImportResult(ReceptionResult.NOT_BONDED))
+            return
+        }
+        // The session must not be put to sleep halfway: a partial wake lock
+        // for its duration (the foreground service alone does not guarantee
+        // the CPU stays up while the screen is off), released whatever happens.
+        val wakeLock = getSystemService(PowerManager::class.java)?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "healthdevices:reading")
+        val outcome = try {
+            wakeLock?.acquire(GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS)
+            withTimeoutOrNull(GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS) {
+                GattSession(this@ReadingService, remote, profile, GattSession.BACKGROUND_TIMEOUT_MS).run()
+            } ?: ReadOutcome(emptyList(), failure = ReadFailure.TIMEOUT)
+        } finally {
+            if (wakeLock?.isHeld == true) wakeLock.release()
+        }
         val result = withContext(Dispatchers.IO) {
             Importer(this@ReadingService, store).import(device, outcome, Instant.now()) { Notifications.format(this@ReadingService, it) }
         }
-        lastCompleted[address] = System.currentTimeMillis()
+        if (result.result.armsCooldown) lastCompleted[address] = System.currentTimeMillis()
         Notifications.result(this, device.label, result)
     }
 
@@ -163,7 +179,18 @@ class ReadingService : Service() {
                 return
             }
             val intent = Intent(context, ReadingService::class.java).putExtra(EXTRA_ADDRESS, address)
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (e: IllegalStateException) {
+                // ForegroundServiceStartNotAllowedException (Android 12+): the
+                // background start was not exempt this time. Uncaught, it would
+                // end the receiver's process in silence.
+                Log.w(TAG, "foreground service start refused", e)
+                Notifications.problem(context, R.string.problem_service_not_allowed)
+            } catch (e: SecurityException) {
+                Log.w(TAG, "foreground service start refused", e)
+                Notifications.problem(context, R.string.problem_service_not_allowed)
+            }
         }
     }
 }

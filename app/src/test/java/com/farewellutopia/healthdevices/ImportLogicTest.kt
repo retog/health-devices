@@ -1,7 +1,8 @@
 package com.farewellutopia.healthdevices
 
-import com.farewellutopia.healthdevices.ble.toHex
 import com.farewellutopia.healthdevices.importer.ImportLogic
+import com.farewellutopia.healthdevices.profiles.RecordKeys
+import com.farewellutopia.healthdevices.profiles.bloodpressure.BloodPressureMeasurement
 import com.farewellutopia.healthdevices.profiles.bloodpressure.BloodPressureProfile
 import com.farewellutopia.healthdevices.time.DeviceClock
 import com.farewellutopia.healthdevices.time.DeviceTime
@@ -22,16 +23,16 @@ class ImportLogicTest {
     private val newer = Frames.bp(128, 79, time = Frames.dateTime(2026, 11, 4, 7, 30, 0), pulse = 64)
     private val stampless = Frames.bp(130, 85, pulse = 70)
 
-    private fun plan(frames: List<ByteArray>, watermark: Long? = null, seen: List<String> = emptyList()) =
-        ImportLogic.plan(frames, BloodPressureProfile, DeviceClock.LOCAL, zurich, received, watermark, seen)
+    private fun plan(frames: List<ByteArray>, watermark: Long? = null, clock: DeviceClock = DeviceClock.LOCAL) =
+        ImportLogic.plan(frames, BloodPressureProfile, clock, zurich, received, watermark)
 
     @Test
     fun everythingWithoutWatermark() {
         val p = plan(listOf(older, newer))
         assertEquals(2, p.toWrite.size)
-        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 30, 0)), p.watermark)
         assertEquals(0, p.skippedOld)
         assertFalse(p.anyReceiveTime)
+        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 30, 0)), ImportLogic.watermarkAfter(null, p.toWrite))
     }
 
     @Test
@@ -39,9 +40,9 @@ class ImportLogicTest {
         val wm = DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 3, 7, 0, 0))
         val p = plan(listOf(older, newer), watermark = wm)
         assertEquals(1, p.toWrite.size)
-        assertEquals(128.0, (p.toWrite[0].reading as com.farewellutopia.healthdevices.profiles.bloodpressure.BloodPressureMeasurement).systolicMmHg)
+        assertEquals(128.0, (p.toWrite[0].reading as BloodPressureMeasurement).systolicMmHg)
         assertEquals(1, p.skippedOld)
-        assertTrue(p.watermark!! > wm)
+        assertTrue(ImportLogic.watermarkAfter(wm, p.toWrite)!! > wm)
     }
 
     @Test
@@ -49,12 +50,12 @@ class ImportLogicTest {
         val wm = DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 5, 0, 0, 0))
         val p = plan(listOf(older, newer), watermark = wm)
         assertTrue(p.toWrite.isEmpty())
-        assertEquals(wm, p.watermark)
+        assertEquals(wm, ImportLogic.watermarkAfter(wm, p.toWrite))
         assertEquals(2, p.skippedOld)
     }
 
     @Test
-    fun duplicateInstantsCollapse() {
+    fun duplicateStampsCollapse() {
         val p = plan(listOf(newer, newer.copyOf()))
         assertEquals(1, p.toWrite.size)
     }
@@ -67,19 +68,26 @@ class ImportLogicTest {
     }
 
     @Test
-    fun stamplessReadingUsesReceiveTimeAndIsRememberedByContent() {
-        val first = plan(listOf(stampless))
-        assertEquals(1, first.toWrite.size)
-        assertFalse(first.toWrite[0].time.fromDevice)
-        assertEquals(received, first.toWrite[0].time.instant)
-        assertTrue(first.anyReceiveTime)
-        assertNull(first.watermark)
-        val seen = ImportLogic.seenAfter(emptyList(), first)
-        assertEquals(listOf(stampless.toHex()), seen)
-        // The same frame again, later: recognised and skipped.
-        val second = ImportLogic.plan(listOf(stampless), BloodPressureProfile, DeviceClock.LOCAL, zurich, received.plusSeconds(3600), null, seen)
-        assertTrue(second.toWrite.isEmpty())
-        assertEquals(1, second.skippedSeen)
+    fun stamplessReadingsAreAllKeptWithDistinctKeys() {
+        // Three readings without a time stamp, two of them byte-identical: three readings, three ids.
+        val p = plan(listOf(stampless, Frames.bp(120, 80, pulse = 60), stampless.copyOf()))
+        assertEquals(3, p.toWrite.size)
+        assertTrue(p.anyReceiveTime)
+        assertTrue(p.toWrite.all { !it.time.fromDevice && it.time.instant == received })
+        assertEquals(listOf(0, 1, 2), p.toWrite.map { it.time.sequence })
+        val keys = p.toWrite.map { RecordKeys.key(RecordKeys.BLOOD_PRESSURE, "X", it.time) }
+        assertEquals(3, keys.toSet().size)
+        assertTrue(keys.all { it.endsWith("-rx-${keys.indexOf(it)}") })
+        // They carry no device stamp, so they never move the watermark.
+        assertNull(ImportLogic.watermarkAfter(null, p.toWrite))
+    }
+
+    @Test
+    fun stampedAndStamplessMix() {
+        val p = plan(listOf(stampless, newer, stampless))
+        assertEquals(3, p.toWrite.size)
+        assertEquals(1, p.toWrite.count { it.time.fromDevice })
+        assertEquals(listOf(0, 1), p.toWrite.filter { !it.time.fromDevice }.map { it.time.sequence })
     }
 
     @Test
@@ -87,24 +95,53 @@ class ImportLogicTest {
         val unset = Frames.bp(120, 80, time = Frames.dateTime(2000, 1, 1, 0, 0, 0))
         val p = plan(listOf(unset))
         assertFalse(p.toWrite[0].time.fromDevice)
-        assertNull(p.watermark)
+        assertNull(ImportLogic.watermarkAfter(null, p.toWrite))
     }
 
     @Test
-    fun seenListIsCapped() {
-        val seen = (1..ImportLogic.SEEN_LIMIT).map { "%04x".format(it) }
-        val p = plan(listOf(stampless))
-        val after = ImportLogic.seenAfter(seen, p)
-        assertEquals(ImportLogic.SEEN_LIMIT, after.size)
-        assertEquals(stampless.toHex(), after.last())
-        assertFalse("0001" in after)
+    fun futureStampDoesNotBecomeTheWatermark() {
+        // A device clock set to 2062: the reading is kept (at the receive time), but it must not
+        // become a watermark that hides every real reading after it.
+        val future = Frames.bp(120, 80, time = Frames.dateTime(2062, 1, 1, 0, 0, 0))
+        val p = plan(listOf(future, newer))
+        assertEquals(2, p.toWrite.size)
+        val futureReading = p.toWrite.first { !it.time.fromDevice }
+        assertEquals(received, futureReading.time.instant)
+        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 30, 0)), ImportLogic.watermarkAfter(null, p.toWrite))
+        // Just inside the allowance (received 09:00 local; 23 h ahead) is still believed.
+        val soon = Frames.bp(120, 80, time = Frames.dateTime(2026, 11, 5, 8, 0, 0))
+        assertTrue(plan(listOf(soon)).toWrite[0].time.fromDevice)
+    }
+
+    @Test
+    fun watermarkAdvancesOnlyPastDoneReadings() {
+        val p = plan(listOf(older, newer))
+        val onlyOlderDone = p.toWrite.filter { (it.reading as BloodPressureMeasurement).systolicMmHg == 118.0 }
+        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 3, 7, 0, 0)), ImportLogic.watermarkAfter(null, onlyOlderDone))
+        // An older "before" never pulls the watermark back.
+        val wm = DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 0, 0))
+        assertEquals(wm, ImportLogic.watermarkAfter(wm, onlyOlderDone))
+        assertEquals(wm, ImportLogic.watermarkAfter(wm, emptyList()))
+    }
+
+    @Test
+    fun newestStampForPairing() {
+        val newest = DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 30, 0))
+        assertEquals(newest, ImportLogic.newestStamp(listOf(older, newer, stampless), BloodPressureProfile, DeviceClock.LOCAL, zurich, received))
+        // The same whatever the clock setting: the watermark is naive.
+        assertEquals(newest, ImportLogic.newestStamp(listOf(older, newer), BloodPressureProfile, DeviceClock.UTC, zurich, received))
+        // Implausible stamps do not count; no usable stamp means null (everything is new).
+        val future = Frames.bp(120, 80, time = Frames.dateTime(2062, 1, 1, 0, 0, 0))
+        assertEquals(newest, ImportLogic.newestStamp(listOf(newer, future), BloodPressureProfile, DeviceClock.LOCAL, zurich, received))
+        assertNull(ImportLogic.newestStamp(listOf(stampless, future), BloodPressureProfile, DeviceClock.LOCAL, zurich, received))
+        assertNull(ImportLogic.newestStamp(emptyList(), BloodPressureProfile, DeviceClock.LOCAL, zurich, received))
     }
 
     @Test
     fun clockSettingChangesInstantNotWatermark() {
         val local = plan(listOf(newer))
-        val utc = ImportLogic.plan(listOf(newer), BloodPressureProfile, DeviceClock.UTC, zurich, received, null, emptyList())
-        assertEquals(local.watermark, utc.watermark)
+        val utc = plan(listOf(newer), clock = DeviceClock.UTC)
+        assertEquals(ImportLogic.watermarkAfter(null, local.toWrite), ImportLogic.watermarkAfter(null, utc.toWrite))
         assertEquals(Instant.parse("2026-11-04T06:30:00Z"), local.toWrite[0].time.instant)
         assertEquals(Instant.parse("2026-11-04T07:30:00Z"), utc.toWrite[0].time.instant)
     }

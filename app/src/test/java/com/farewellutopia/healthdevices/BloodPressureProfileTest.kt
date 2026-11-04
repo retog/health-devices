@@ -26,7 +26,9 @@ class BloodPressureProfileTest {
     @Test
     fun bloodPressureAndHeartRateRecords() {
         val reading = BloodPressureProfile.decode(Frames.bp(128, 79, time = Frames.dateTime(2026, 11, 4, 7, 30, 0), pulse = 64))!!
-        val records = BloodPressureProfile.records(reading, time, "AA:BB:CC:DD:EE:FF", metadata)
+        val built = BloodPressureProfile.records(reading, time, "AA:BB:CC:DD:EE:FF", metadata)
+        assertTrue(built.rejected.isEmpty())
+        val records = built.records
         assertEquals(2, records.size)
         val bp = assertIs<BloodPressureRecord>(records[0])
         assertEquals(128.0, bp.systolic.inMillimetersOfMercury)
@@ -49,29 +51,54 @@ class BloodPressureProfileTest {
     @Test
     fun noPulseMeansNoHeartRateRecord() {
         val reading = BloodPressureProfile.decode(Frames.bp(120, 80))!!
-        val records = BloodPressureProfile.records(reading, time, "X", metadata)
-        assertEquals(1, records.size)
-        assertIs<BloodPressureRecord>(records[0])
+        val built = BloodPressureProfile.records(reading, time, "X", metadata)
+        assertEquals(1, built.records.size)
+        assertIs<BloodPressureRecord>(built.records[0])
+        assertTrue(built.rejected.isEmpty())
     }
 
     @Test
-    fun outOfRangeValuesAreSkippedNotThrown() {
-        // Systolic 250 is outside Health Connect's range; the pulse is still written.
+    fun highReadingsWithinHealthConnectRangesAreWritten() {
+        // A hypertensive crisis must not vanish: 195/115 is inside the client's ranges and becomes a record.
+        val reading = BloodPressureProfile.decode(Frames.bp(195, 115, pulse = 140))!!
+        val built = BloodPressureProfile.records(reading, time, "X", metadata)
+        assertEquals(2, built.records.size)
+        assertTrue(built.rejected.isEmpty())
+    }
+
+    @Test
+    fun valuesTheClientRefusesAreReportedNotDropped() {
+        // The Health Connect client validates systolic 20–200 mmHg in the record constructor;
+        // 250 cannot become a record, and the import has to say so. The pulse is still written.
         val reading = BloodPressureProfile.decode(Frames.bp(250, 80, pulse = 70))!!
-        val records = BloodPressureProfile.records(reading, time, "X", metadata)
-        assertEquals(1, records.size)
-        assertIs<HeartRateRecord>(records[0])
-        // A NaN systolic likewise.
+        val built = BloodPressureProfile.records(reading, time, "X", metadata)
+        assertEquals(1, built.records.size)
+        assertIs<HeartRateRecord>(built.records[0])
+        assertEquals(1, built.rejected.size)
+        assertTrue(built.rejected[0].startsWith("blood pressure 250/80 mmHg"), built.rejected[0])
+        // A pulse of 0 likewise (the client wants 1–300).
+        val zeroPulse = BloodPressureProfile.decode(Frames.bp(120, 80, pulse = 0))!!
+        val built2 = BloodPressureProfile.records(zeroPulse, time, "X", metadata)
+        assertEquals(1, built2.records.size)
+        assertIs<BloodPressureRecord>(built2.records[0])
+        assertEquals(1, built2.rejected.size)
+        assertTrue(built2.rejected[0].startsWith("pulse 0"), built2.rejected[0])
+    }
+
+    @Test
+    fun nanPressuresAreRejectedWithReason() {
         val nan = BloodPressureProfile.decode(Frames.bp(0, 0, pressures = listOf(Frames.sfloat(0x7FF, 0), Frames.sfloat(80), Frames.sfloat(90))))!!
-        assertTrue(BloodPressureProfile.records(nan, time, "X", metadata).isEmpty())
+        val built = BloodPressureProfile.records(nan, time, "X", metadata)
+        assertTrue(built.records.isEmpty())
+        assertEquals(listOf("blood pressure without valid pressures"), built.rejected)
     }
 
     @Test
     fun receiveTimeKeysCarrySuffix() {
-        val rx = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = false)
+        val rx = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = false, sequence = 2)
         val reading = BloodPressureProfile.decode(Frames.bp(120, 80, pulse = 60))!!
-        val records = BloodPressureProfile.records(reading, rx, "X", metadata)
-        assertTrue(records.all { it.metadata.clientRecordId!!.endsWith("-rx") })
+        val built = BloodPressureProfile.records(reading, rx, "X", metadata)
+        assertTrue(built.records.all { it.metadata.clientRecordId!!.endsWith("-rx-2") })
     }
 
     @Test

@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.refresh()
-        viewModel.registerScan()
+        viewModel.ensureScan()
     }
 
     private val requestHealthConnect = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) {
@@ -64,7 +64,11 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         viewModel.refresh()
-        viewModel.registerScan()
+        // Registers only when due (first time in this process, nothing
+        // registered, or the device set changed): Android downgrades an app
+        // that starts scans more than five times in 30 s to opportunistic
+        // scanning without saying so.
+        viewModel.ensureScan()
     }
 
     override fun onStop() {

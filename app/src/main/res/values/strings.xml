@@ -28,12 +28,23 @@
     <string name="notification_subscribe_failed">Could not subscribe to measurements. The pairing may be gone: check the system\'s Bluetooth settings or pair again.</string>
     <string name="notification_hc_unavailable">Health Connect is not available on this phone, so the readings were not written.</string>
     <string name="notification_hc_denied">Health Connect permissions are missing. Open the app to grant them.</string>
-    <string name="notification_hc_error">Health Connect refused the readings. Open the app for details.</string>
+    <string name="notification_hc_error">Health Connect could not write the readings (%1$s). They will be retried at the next reception.</string>
     <string name="notification_bluetooth_off">Bluetooth is off, so the device could not be read.</string>
     <string name="notification_no_permission">Bluetooth permissions are missing. Open the app to grant them.</string>
     <string name="problem_scan_failed">The background scan stopped. Open the app to register it again.</string>
     <string name="problem_scan_not_registered">The background scan could not be registered. Open the app to see why.</string>
     <string name="problem_service_not_allowed">Android did not allow reading in the background. Open the app once; then try another measurement.</string>
+    <string name="problem_unexpected">Something went wrong while handling a Bluetooth event. Open the app to check the state.</string>
+    <string name="notification_hc_rejected">Health Connect did not accept the readings: %1$s</string>
+    <string name="notification_not_bonded">The Bluetooth pairing with the device is gone. Open the app and pair it again.</string>
+    <plurals name="notification_skipped">
+        <item quantity="one">%1$d reading not accepted by Health Connect (%2$s)</item>
+        <item quantity="other">%1$d readings not accepted by Health Connect (%2$s)</item>
+    </plurals>
+    <plurals name="notification_failed">
+        <item quantity="one">%1$d reading could not be written and will be retried</item>
+        <item quantity="other">%1$d readings could not be written and will be retried</item>
+    </plurals>
     <string name="problem_no_permission">Bluetooth permissions are missing, so the device could not be read. Open the app to grant them.</string>
 
     <!-- Measurement status notes -->
@@ -71,11 +82,12 @@
     <string name="notifications_ok">Notifications allowed.</string>
     <string name="notifications_missing">Notifications not allowed: you will not see what was read.</string>
     <string name="scan_registered">Scan registered (%1$s).</string>
-    <string name="scan_registered_all_matches">Scan registered (%1$s); this phone reports every advertisement, so a device may be contacted more than once.</string>
+    <string name="scan_registered_all_matches">Scan registered (%1$s) without first-match filtering (the controller refused it, code %2$d); every advertisement is reported, so a device may be contacted more than once.</string>
     <string name="scan_never">Scan not registered yet.</string>
     <string name="scan_problem_no_permission">Scan not registered: permissions missing.</string>
     <string name="scan_problem_bluetooth_off">Scan not registered: Bluetooth is off. It registers itself when Bluetooth turns on.</string>
     <string name="scan_problem_no_devices">Scan not registered: no paired device.</string>
+    <string name="scan_problem_paused">Scan paused while pairing.</string>
     <string name="scan_problem_failed">Scan not registered: the scanner refused (code %1$d).</string>
     <string name="scan_explanation">The system wakes the app when a paired device advertises after a measurement. It is registered again on boot, when Bluetooth turns on, and whenever this screen opens. After a force-stop (or Samsung\'s "sleeping apps") nothing wakes the app until it is opened again.</string>
     <string name="scan_reregister">Re-register scan</string>
@@ -93,6 +105,8 @@
     <string name="clock_utc">UTC</string>
     <string name="clock_local">Local time (the phone\'s zone)</string>
     <string name="clock_explanation">The device sends a time without a zone; it is read in this zone. A change applies to future readings only.</string>
+    <string name="device_reset_watermark">Re-import everything</string>
+    <string name="device_reset_watermark_hint">Re-import writes everything the device still holds at the next reception; Health Connect keeps one record per reading.</string>
     <string name="device_forget">Forget device</string>
     <string name="device_forget_title">Forget this device?</string>
     <string name="device_forget_text">The app stops reading it. The Bluetooth pairing itself stays until you remove the device in the system\'s Bluetooth settings.</string>
@@ -106,7 +120,9 @@
     <string name="result_timeout">Timed out</string>
     <string name="result_hc_unavailable">Health Connect not available</string>
     <string name="result_hc_denied">Health Connect permissions missing</string>
-    <string name="result_hc_error">Health Connect refused the write</string>
+    <string name="result_hc_error">Health Connect could not write</string>
+    <string name="result_hc_rejected">Health Connect did not accept the values</string>
+    <string name="result_not_bonded">Bluetooth pairing gone</string>
     <string name="result_bluetooth_off">Bluetooth off</string>
     <string name="result_no_permission">Permissions missing</string>
 

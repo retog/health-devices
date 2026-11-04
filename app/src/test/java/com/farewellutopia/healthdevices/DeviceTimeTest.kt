@@ -41,10 +41,11 @@ class DeviceTimeTest {
 
     @Test
     fun absentTimeFallsBackToReceiveTime() {
-        val t = DeviceTime.resolve(null, DeviceClock.LOCAL, zurich, received)
+        val t = DeviceTime.resolve(null, DeviceClock.LOCAL, zurich, received, sequence = 3)
         assertEquals(received, t.instant)
         assertEquals(ZoneOffset.ofHours(1), t.offset)
         assertFalse(t.fromDevice)
+        assertEquals(3, t.sequence)
     }
 
     @Test
@@ -54,8 +55,27 @@ class DeviceTimeTest {
         assertFalse(t.fromDevice)
         // The receive time's offset follows the phone's zone, even for a UTC device.
         assertEquals(ZoneOffset.ofHours(1), t.offset)
-        assertTrue(DeviceTime.isPlausible(LocalDateTime.of(2020, 1, 1, 0, 0)))
-        assertFalse(DeviceTime.isPlausible(LocalDateTime.of(2019, 12, 31, 23, 59)))
+        val latest = DeviceTime.latestPlausible(DeviceClock.UTC, zurich, received)
+        assertTrue(DeviceTime.isPlausible(LocalDateTime.of(2020, 1, 1, 0, 0), latest))
+        assertFalse(DeviceTime.isPlausible(LocalDateTime.of(2019, 12, 31, 23, 59), latest))
+        assertFalse(DeviceTime.isPlausible(null, latest))
+    }
+
+    @Test
+    fun futureStampFallsBackToReceiveTime() {
+        // Received at 08:00Z: a local-clock device may be up to 09:00 local next day, a UTC one up to 08:00Z next day.
+        assertEquals(LocalDateTime.of(2026, 11, 5, 9, 0, 0), DeviceTime.latestPlausible(DeviceClock.LOCAL, zurich, received))
+        assertEquals(LocalDateTime.of(2026, 11, 5, 8, 0, 0), DeviceTime.latestPlausible(DeviceClock.UTC, zurich, received))
+        val farFuture = DeviceTime.resolve(LocalDateTime.of(2062, 1, 1, 0, 0, 0), DeviceClock.LOCAL, zurich, received)
+        assertFalse(farFuture.fromDevice)
+        assertEquals(received, farFuture.instant)
+        val justOver = DeviceTime.resolve(LocalDateTime.of(2026, 11, 5, 9, 0, 1), DeviceClock.LOCAL, zurich, received)
+        assertFalse(justOver.fromDevice)
+        val justInside = DeviceTime.resolve(LocalDateTime.of(2026, 11, 5, 9, 0, 0), DeviceClock.LOCAL, zurich, received)
+        assertTrue(justInside.fromDevice)
+        // A device clock a few minutes fast (the common case) is believed.
+        val slightlyAhead = DeviceTime.resolve(LocalDateTime.of(2026, 11, 4, 9, 5, 0), DeviceClock.LOCAL, zurich, received)
+        assertTrue(slightlyAhead.fromDevice)
     }
 
     @Test
@@ -70,12 +90,9 @@ class DeviceTimeTest {
     }
 
     @Test
-    fun watermarkIsZoneIndependent() {
+    fun watermarkFormIsZoneIndependent() {
         val naive = LocalDateTime.of(2026, 11, 4, 7, 30, 0)
         assertEquals(naive.toEpochSecond(ZoneOffset.UTC), DeviceTime.naiveSeconds(naive))
-        // "Now" as the device sees it: 08:00Z is 09:00 on a local clock in Zurich, 08:00 on a UTC clock.
-        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 9, 0, 0)), DeviceTime.nowAsNaive(DeviceClock.LOCAL, zurich, received))
-        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 8, 0, 0)), DeviceTime.nowAsNaive(DeviceClock.UTC, zurich, received))
     }
 
     @Test

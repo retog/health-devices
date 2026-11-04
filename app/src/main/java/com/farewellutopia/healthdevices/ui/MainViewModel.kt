@@ -37,12 +37,12 @@ import com.farewellutopia.healthdevices.data.ScanState
 import com.farewellutopia.healthdevices.hc.HealthConnectAccess
 import com.farewellutopia.healthdevices.hc.HealthConnectAvailability
 import com.farewellutopia.healthdevices.importer.ImportResult
+import com.farewellutopia.healthdevices.importer.ImportLogic
 import com.farewellutopia.healthdevices.importer.Importer
 import com.farewellutopia.healthdevices.profiles.DeviceProfile
 import com.farewellutopia.healthdevices.profiles.Profiles
 import com.farewellutopia.healthdevices.service.Notifications
 import com.farewellutopia.healthdevices.time.DeviceClock
-import com.farewellutopia.healthdevices.time.DeviceTime
 
 /** A device the pairing scan saw. */
 data class FoundDevice(val address: String, val name: String?, val profile: DeviceProfile)
@@ -54,7 +54,7 @@ sealed interface Pairing {
     data class Connecting(val device: FoundDevice) : Pairing
 
     /** Connected and read; the user now chooses the clock setting and whether to import what arrived. */
-    data class Connected(val device: FoundDevice, val outcome: ReadOutcome) : Pairing
+    data class Connected(val device: FoundDevice, val outcome: ReadOutcome, val bonded: Boolean) : Pairing
     data class Failed(val device: FoundDevice, val outcome: ReadOutcome) : Pairing
 
     /** The import of the readings on the device, if the user chose it. */
@@ -106,11 +106,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** (Re)registers the background scan when there is something to scan for. */
-    fun registerScan() {
+    /** Registers the background scan if it is due (see [BackgroundScan.ensure]); no-op while pairing. */
+    fun ensureScan() {
         viewModelScope.launch(Dispatchers.IO) {
-            if (store.devicesNow().isNotEmpty()) BackgroundScan.register(app, store)
+            if (_pairing.value == Pairing.Idle) BackgroundScan.ensure(app, store)
         }
+    }
+
+    /** The status screen's button: registers again, at most once per [com.farewellutopia.healthdevices.ble.ScanPlan.MANUAL_INTERVAL_MS]. */
+    fun reregisterScan() {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (_pairing.value == Pairing.Idle) BackgroundScan.register(app, store, manual = true)
+        }
+    }
+
+    /** Forgets what was imported so far: the next reception writes everything the device holds (Health Connect upserts). */
+    fun resetWatermark(address: String) {
+        viewModelScope.launch(Dispatchers.IO) { store.updateDevice(address) { it.copy(watermark = null) } }
     }
 
     fun setClock(address: String, clock: DeviceClock) {
@@ -129,6 +141,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startPairing() {
         stopScan()
+        // The background scan is paused while pairing: the device accepts one
+        // connection, and the service must not take it from under the pairing.
+        viewModelScope.launch(Dispatchers.IO) { BackgroundScan.pause(app, store) }
         if (!BackgroundScan.hasPermissions(app)) {
             _pairing.value = Pairing.Scanning(emptyList(), error = ERROR_NO_PERMISSION)
             return
@@ -163,6 +178,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val profile = Profiles.byService(services) ?: return
         val address = result.device.address.uppercase()
         if (current.found.any { it.address == address }) return
+        // Already paired devices are not offered again; "Forget device" first.
+        if (devices.value.any { it.address.equals(address, ignoreCase = true) }) return
         _pairing.value = current.copy(found = current.found + FoundDevice(address, result.scanRecord?.deviceName, profile))
     }
 
@@ -190,14 +207,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Log.w(TAG, "connect refused", e)
                 ReadOutcome(emptyList(), failure = com.farewellutopia.healthdevices.ble.ReadFailure.CONNECT_FAILED)
             }
-            _pairing.value = if (outcome.failure == null) Pairing.Connected(found, outcome) else Pairing.Failed(found, outcome)
+            val bonded = try {
+                remote.bondState == BluetoothDevice.BOND_BONDED
+            } catch (e: SecurityException) {
+                false
+            }
+            _pairing.value = if (outcome.failure == null) Pairing.Connected(found, outcome, bonded) else Pairing.Failed(found, outcome)
         }
     }
 
     /**
      * Stores the device and either imports what the first connection brought
-     * (watermark from the data) or starts from now (watermark = the current
-     * wall clock in the device's zone). Then the background scan covers it.
+     * (watermark from the data) or leaves it alone (watermark = the newest
+     * stamp the device just sent, so exactly what it holds now counts as old
+     * — independent of the phone's clock and of the zone setting). Then the
+     * background scan covers it.
      */
     fun finishPairing(clock: DeviceClock, importExisting: Boolean) {
         val state = _pairing.value as? Pairing.Connected ?: return
@@ -211,7 +235,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 profileId = state.device.profile.id,
                 hasCurrentTimeService = state.outcome.hasCurrentTimeService,
                 clock = clock,
-                watermark = if (importExisting) null else DeviceTime.nowAsNaive(clock, ZoneId.systemDefault(), now),
+                watermark = if (importExisting) null else ImportLogic.newestStamp(state.outcome.frames, state.device.profile, clock, ZoneId.systemDefault(), now),
+                bonded = state.bonded,
                 pairedAt = now.toEpochMilli(),
             )
             store.putDevice(device)
@@ -230,6 +255,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         connectJob?.cancel()
         connectJob = null
         _pairing.value = Pairing.Idle
+        // The pause in startPairing ends here (or in finishPairing).
+        viewModelScope.launch(Dispatchers.IO) { if (store.devicesNow().isNotEmpty()) BackgroundScan.register(app, store) }
     }
 
     override fun onCleared() {

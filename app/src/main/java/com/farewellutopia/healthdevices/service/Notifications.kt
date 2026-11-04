@@ -69,8 +69,15 @@ object Notifications {
                 val lines = mutableListOf(format(context, result.latest!!), count)
                 result.notes.forEach { lines += context.getString(noteText(it)) }
                 if (result.anyReceiveTime) lines += context.getString(R.string.notification_receive_time)
+                if (result.skipped > 0) {
+                    lines += context.resources.getQuantityString(R.plurals.notification_skipped, result.skipped, result.skipped, result.detail ?: "")
+                }
+                if (result.failed > 0) lines += context.resources.getQuantityString(R.plurals.notification_failed, result.failed, result.failed)
                 Triple(CHANNEL_READINGS, deviceLabel, lines.joinToString(" — "))
             }
+            ReceptionResult.HEALTH_CONNECT_REJECTED ->
+                Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_hc_rejected, result.detail ?: ""))
+            ReceptionResult.NOT_BONDED -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_not_bonded))
             ReceptionResult.NO_DATA -> Triple(CHANNEL_READINGS, deviceLabel, context.getString(R.string.notification_nothing_new))
             ReceptionResult.CONNECT_FAILED, ReceptionResult.TIMEOUT ->
                 Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_connect_failed))
@@ -78,7 +85,7 @@ object Notifications {
             ReceptionResult.SUBSCRIBE_FAILED -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_subscribe_failed))
             ReceptionResult.HEALTH_CONNECT_UNAVAILABLE -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_hc_unavailable))
             ReceptionResult.HEALTH_CONNECT_DENIED -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_hc_denied))
-            ReceptionResult.HEALTH_CONNECT_ERROR -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_hc_error))
+            ReceptionResult.HEALTH_CONNECT_ERROR -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_hc_error, result.detail ?: ""))
             ReceptionResult.BLUETOOTH_OFF -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_bluetooth_off))
             ReceptionResult.NO_PERMISSION -> Triple(CHANNEL_PROBLEMS, deviceLabel, context.getString(R.string.notification_no_permission))
         }

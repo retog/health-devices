@@ -86,7 +86,7 @@ fun StatusScreen(
         item {
             Section(R.string.section_background) {
                 when {
-                    scan.registered && scan.allMatches -> Line(stringResource(R.string.scan_registered_all_matches, formatTime(scan.at)), ok = true)
+                    scan.registered && scan.allMatches -> Line(stringResource(R.string.scan_registered_all_matches, formatTime(scan.at), scan.code), ok = true)
                     scan.registered -> Line(stringResource(R.string.scan_registered, formatTime(scan.at)), ok = true)
                     scan.at == 0L -> Line(stringResource(R.string.scan_never), ok = false)
                     else -> Line(
@@ -94,13 +94,14 @@ fun StatusScreen(
                             ScanProblem.NO_PERMISSION -> stringResource(R.string.scan_problem_no_permission)
                             ScanProblem.BLUETOOTH_OFF -> stringResource(R.string.scan_problem_bluetooth_off)
                             ScanProblem.NO_DEVICES -> stringResource(R.string.scan_problem_no_devices)
+                            ScanProblem.PAUSED -> stringResource(R.string.scan_problem_paused)
                             ScanProblem.FAILED, null -> stringResource(R.string.scan_problem_failed, scan.code)
                         },
                         ok = false,
                     )
                 }
                 Hint(stringResource(R.string.scan_explanation))
-                OutlinedButton(onClick = { viewModel.registerScan() }, modifier = Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.scan_reregister)) }
+                OutlinedButton(onClick = { viewModel.reregisterScan() }, modifier = Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.scan_reregister)) }
             }
         }
 
@@ -145,7 +146,11 @@ private fun DeviceCard(device: PairedDevice, viewModel: MainViewModel) {
         Text(stringResource(R.string.device_clock_label), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
         ClockChoice(device.clock) { viewModel.setClock(device.address, it) }
         Hint(stringResource(R.string.clock_explanation))
-        TextButton(onClick = { confirmForget = true }) { Text(stringResource(R.string.device_forget)) }
+        Hint(stringResource(R.string.device_reset_watermark_hint))
+        Row {
+            TextButton(onClick = { viewModel.resetWatermark(device.address) }) { Text(stringResource(R.string.device_reset_watermark)) }
+            TextButton(onClick = { confirmForget = true }) { Text(stringResource(R.string.device_forget)) }
+        }
     }
     if (confirmForget) {
         AlertDialog(
@@ -180,6 +185,9 @@ private fun ReceptionRow(reception: Reception) {
         Line(stringResource(resultText(reception.result)), ok = reception.result == com.farewellutopia.healthdevices.data.ReceptionResult.OK)
         if (reception.newReadings > 0) {
             Hint(pluralStringResource(R.plurals.notification_new_readings, reception.newReadings, reception.newReadings))
+        }
+        if (reception.skipped > 0) {
+            Hint(pluralStringResource(R.plurals.notification_skipped, reception.skipped, reception.skipped, reception.detail ?: ""))
         }
         reception.summary?.let { Hint(it) }
         reception.detail?.let { Hint(it) }

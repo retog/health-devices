@@ -6,6 +6,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class RecordKeysTest {
 
@@ -19,15 +20,18 @@ class RecordKeysTest {
     }
 
     @Test
-    fun receiveTimeKeyIsMarked() {
-        val t = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = false)
-        assertEquals("bp:aa:bb:cc:dd:ee:ff:${instant.epochSecond}-rx", RecordKeys.key(RecordKeys.BLOOD_PRESSURE, "AA:BB:CC:DD:EE:FF", t))
+    fun receiveTimeKeysAreMarkedAndNumbered() {
+        val first = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = false, sequence = 0)
+        val second = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = false, sequence = 1)
+        assertEquals("bp:aa:bb:cc:dd:ee:ff:${instant.epochSecond}-rx-0", RecordKeys.key(RecordKeys.BLOOD_PRESSURE, "AA:BB:CC:DD:EE:FF", first))
+        assertEquals("bp:aa:bb:cc:dd:ee:ff:${instant.epochSecond}-rx-1", RecordKeys.key(RecordKeys.BLOOD_PRESSURE, "AA:BB:CC:DD:EE:FF", second))
+        assertNotEquals(RecordKeys.key("bp", "X", first), RecordKeys.key("bp", "X", second))
     }
 
     @Test
-    fun keyIgnoresZoneOffset() {
-        val a = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = true)
-        val b = ResolvedTime(instant, ZoneOffset.UTC, fromDevice = true)
+    fun keyIgnoresZoneOffsetAndSequenceForDeviceTime() {
+        val a = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = true, sequence = 0)
+        val b = ResolvedTime(instant, ZoneOffset.UTC, fromDevice = true, sequence = 5)
         assertEquals(RecordKeys.key("bp", "X", a), RecordKeys.key("bp", "X", b))
     }
 }

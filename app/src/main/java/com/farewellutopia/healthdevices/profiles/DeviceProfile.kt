@@ -48,13 +48,19 @@ interface DeviceProfile {
     /**
      * The Health Connect records for one reading at its resolved instant.
      * [metadata] builds the record metadata for a client record id; the ids
-     * come from [RecordKeys] so re-importing the same reading upserts.
+     * come from [RecordKeys] so re-importing the same reading upserts. A value
+     * the Health Connect client refuses (its records validate their ranges in
+     * the constructor) is not a record but a line in [ProfileRecords.rejected],
+     * so the import can say what was left out rather than drop it in silence.
      */
-    fun records(reading: Reading, time: ResolvedTime, address: String, metadata: (clientRecordId: String) -> Metadata): List<Record>
+    fun records(reading: Reading, time: ResolvedTime, address: String, metadata: (clientRecordId: String) -> Metadata): ProfileRecords
 
     /** A short human line for the notification and the log, e.g. "128/79 mmHg, pulse 64", as a string resource and its arguments. */
     fun summary(reading: Reading): Summary
 }
+
+/** What one reading became: the records to insert, and why any value could not become one. */
+data class ProfileRecords(val records: List<Record>, val rejected: List<String> = emptyList())
 
 /** A string resource with its format arguments: the profile says what, the resources say how. */
 data class Summary(val textRes: Int, val args: List<Any>)

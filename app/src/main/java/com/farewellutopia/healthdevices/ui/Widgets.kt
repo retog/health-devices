@@ -54,6 +54,8 @@ fun resultText(result: ReceptionResult): Int = when (result) {
     ReceptionResult.HEALTH_CONNECT_UNAVAILABLE -> R.string.result_hc_unavailable
     ReceptionResult.HEALTH_CONNECT_DENIED -> R.string.result_hc_denied
     ReceptionResult.HEALTH_CONNECT_ERROR -> R.string.result_hc_error
+    ReceptionResult.HEALTH_CONNECT_REJECTED -> R.string.result_hc_rejected
+    ReceptionResult.NOT_BONDED -> R.string.result_not_bonded
     ReceptionResult.BLUETOOTH_OFF -> R.string.result_bluetooth_off
     ReceptionResult.NO_PERMISSION -> R.string.result_no_permission
 }

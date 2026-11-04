@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- The reading summary and the problem notifications (Android 13+ asks at runtime). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The CPU stays up for the length of one reception (screen off). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The background scan is registered again after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- What is written to Health Connect; the user grants each in its dialog. -->
@@ -31,7 +33,7 @@
 
     <application
         android:name=".HealthDevicesApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
