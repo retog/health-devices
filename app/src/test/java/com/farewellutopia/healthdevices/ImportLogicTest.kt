@@ -128,7 +128,8 @@ class ImportLogicTest {
         val full = (1..ImportLogic.UNSTAMPED_LIMIT).associate { "%04x".format(it) to 1 }
         val after = ImportLogic.unstampedCountsAfter(full, p.toWrite)
         assertEquals(ImportLogic.UNSTAMPED_LIMIT, after.size)
-        assertEquals(1, after[stampless.toHex()])
+        // Both occurrences were done: the new frame counts two, and one old entry made room for it.
+        assertEquals(2, after[stampless.toHex()])
         assertFalse("0001" in after)
         assertTrue("0002" in after)
     }
