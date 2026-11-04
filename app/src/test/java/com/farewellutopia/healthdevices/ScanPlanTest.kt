@@ -73,7 +73,10 @@ class ScanRegistrationRulesTest {
         val registered = ScanState(registered = true, at = 100_000)
         assertFalse(ScanPlan.manualAllowed(registered, 100_000 + ScanPlan.MANUAL_INTERVAL_MS - 1))
         assertTrue(ScanPlan.manualAllowed(registered, 100_000 + ScanPlan.MANUAL_INTERVAL_MS))
-        // Nothing registered: always worth a try.
-        assertTrue(ScanPlan.manualAllowed(registered.copy(registered = false), 100_001))
+        // A failed attempt counts too: the budget is per start, successful or not.
+        assertFalse(ScanPlan.manualAllowed(registered.copy(registered = false), 100_001))
+        assertTrue(ScanPlan.manualAllowed(registered.copy(registered = false), 100_000 + ScanPlan.MANUAL_INTERVAL_MS))
+        // Never attempted: allowed.
+        assertTrue(ScanPlan.manualAllowed(ScanState(), 100_001))
     }
 }

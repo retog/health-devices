@@ -110,6 +110,25 @@ class ReadStateMachineTest {
     }
 
     @Test
+    fun retryDropsFramesOfTheFirstAttempt() {
+        val m = machine()
+        connected(m)
+        m.on(ReadEvent.ServicesDiscovered(0, bareDevice))
+        m.on(ReadEvent.SettleElapsed)
+        // An indication slips in before the subscription is acknowledged, then the link drops.
+        m.on(ReadEvent.Measurement(byteArrayOf(1)))
+        assertEquals(listOf(ReadAction.RetryConnect(ReadStateMachine.RETRY_DELAY_MS)), m.on(ReadEvent.ConnectionChanged(false, 8)))
+        // The second connection brings the whole memory again.
+        m.on(ReadEvent.ConnectionChanged(true, 0))
+        m.on(ReadEvent.ServicesDiscovered(0, bareDevice))
+        m.on(ReadEvent.SettleElapsed)
+        m.on(ReadEvent.Subscribed(0))
+        m.on(ReadEvent.Measurement(byteArrayOf(1)))
+        val finish = assertIs<ReadAction.Finish>(m.on(ReadEvent.ConnectionChanged(false, 0)).single())
+        assertEquals(1, finish.outcome.frames.size)
+    }
+
+    @Test
     fun disconnectDuringDiscoveryRetries() {
         val m = machine()
         connected(m)

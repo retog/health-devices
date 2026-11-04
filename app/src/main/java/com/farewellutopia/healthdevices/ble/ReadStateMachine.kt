@@ -189,6 +189,10 @@ class ReadStateMachine(
             retried = true
             state = State.CONNECTING
             pendingReads.clear()
+            // The new connection brings the device's whole memory again; an
+            // indication that slipped through before the drop would otherwise
+            // be counted twice.
+            frames.clear()
             return listOf(ReadAction.RetryConnect(retryDelayMs))
         }
         return finish(ReadOutcome(emptyList(), manufacturer, model, hasCurrentTime, failure, status))

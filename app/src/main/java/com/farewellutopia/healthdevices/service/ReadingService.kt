@@ -130,23 +130,25 @@ class ReadingService : Service() {
             report(device, ImportResult(ReceptionResult.NOT_BONDED))
             return
         }
-        // The session must not be put to sleep halfway: a partial wake lock
-        // for its duration (the foreground service alone does not guarantee
-        // the CPU stays up while the screen is off), released whatever happens.
+        // The reception must not be put to sleep halfway — neither the session
+        // nor the Health Connect write and the store update after it: a partial
+        // wake lock for the whole of it (the foreground service alone does not
+        // guarantee the CPU stays up while the screen is off), released
+        // whatever happens.
         val wakeLock = getSystemService(PowerManager::class.java)?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "healthdevices:reading")
-        val outcome = try {
-            wakeLock?.acquire(GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS)
-            withTimeoutOrNull(GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS) {
+        try {
+            wakeLock?.acquire(WAKE_LOCK_MS)
+            val outcome = withTimeoutOrNull(GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS) {
                 GattSession(this@ReadingService, remote, profile, GattSession.BACKGROUND_TIMEOUT_MS).run()
             } ?: ReadOutcome(emptyList(), failure = ReadFailure.TIMEOUT)
+            val result = withContext(Dispatchers.IO) {
+                Importer(this@ReadingService, store).import(device, outcome, Instant.now()) { Notifications.format(this@ReadingService, it) }
+            }
+            if (result.result.armsCooldown) lastCompleted[address] = System.currentTimeMillis()
+            Notifications.result(this, device.label, result)
         } finally {
             if (wakeLock?.isHeld == true) wakeLock.release()
         }
-        val result = withContext(Dispatchers.IO) {
-            Importer(this@ReadingService, store).import(device, outcome, Instant.now()) { Notifications.format(this@ReadingService, it) }
-        }
-        if (result.result.armsCooldown) lastCompleted[address] = System.currentTimeMillis()
-        Notifications.result(this, device.label, result)
     }
 
     /** A reception that never reached the device: logged and notified like any other. */
@@ -169,6 +171,9 @@ class ReadingService : Service() {
 
         /** Beyond the session's own timeout, so a stuck stack cannot pin the service. */
         private const val GRACE_MS = 10_000L
+
+        /** The session plus its grace, plus the Health Connect write and the store update. */
+        private const val WAKE_LOCK_MS = GattSession.BACKGROUND_TIMEOUT_MS + GRACE_MS + 15_000L
 
         /** Process-wide, so the cooldown survives the service being stopped between receptions. */
         private val lastCompleted = java.util.concurrent.ConcurrentHashMap<String, Long>()

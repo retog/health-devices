@@ -9,7 +9,9 @@ import com.farewellutopia.healthdevices.profiles.Profiles
 import com.farewellutopia.healthdevices.profiles.RecordKeys
 import com.farewellutopia.healthdevices.profiles.bloodpressure.BloodPressureProfile
 import com.farewellutopia.healthdevices.time.ResolvedTime
+import com.farewellutopia.healthdevices.time.DeviceTime
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,7 +21,8 @@ import kotlin.test.assertTrue
 class BloodPressureProfileTest {
 
     private val instant = Instant.parse("2026-11-04T06:30:00Z")
-    private val time = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = true)
+    private val stamp = DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 30, 0))
+    private val time = ResolvedTime(instant, ZoneOffset.ofHours(1), fromDevice = true, deviceStamp = stamp)
     private val device = Device(type = Device.TYPE_UNKNOWN, manufacturer = "Beurer", model = "BM81")
     private val metadata: (String) -> Metadata = { id -> Metadata.autoRecorded(device, id, RecordKeys.VERSION) }
 
@@ -35,7 +38,7 @@ class BloodPressureProfileTest {
         assertEquals(79.0, bp.diastolic.inMillimetersOfMercury)
         assertEquals(instant, bp.time)
         assertEquals(ZoneOffset.ofHours(1), bp.zoneOffset)
-        assertEquals("bp:aa:bb:cc:dd:ee:ff:${instant.epochSecond}", bp.metadata.clientRecordId)
+        assertEquals("bp:aa:bb:cc:dd:ee:ff:$stamp", bp.metadata.clientRecordId)
         assertEquals(1L, bp.metadata.clientRecordVersion)
         assertEquals(Metadata.RECORDING_METHOD_AUTOMATICALLY_RECORDED, bp.metadata.recordingMethod)
         assertEquals("Beurer", bp.metadata.device?.manufacturer)
@@ -45,7 +48,7 @@ class BloodPressureProfileTest {
         assertEquals(1, hr.samples.size)
         assertEquals(64L, hr.samples[0].beatsPerMinute)
         assertEquals(instant, hr.samples[0].time)
-        assertEquals("hr:aa:bb:cc:dd:ee:ff:${instant.epochSecond}", hr.metadata.clientRecordId)
+        assertEquals("hr:aa:bb:cc:dd:ee:ff:$stamp", hr.metadata.clientRecordId)
     }
 
     @Test

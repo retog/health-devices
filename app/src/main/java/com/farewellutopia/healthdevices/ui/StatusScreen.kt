@@ -134,6 +134,7 @@ fun StatusScreen(
 @Composable
 private fun DeviceCard(device: PairedDevice, viewModel: MainViewModel) {
     var confirmForget by remember { mutableStateOf(false) }
+    var confirmReimport by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Text(device.label, style = MaterialTheme.typography.titleSmall)
         Hint(stringResource(R.string.device_address, device.address))
@@ -148,9 +149,20 @@ private fun DeviceCard(device: PairedDevice, viewModel: MainViewModel) {
         Hint(stringResource(R.string.clock_explanation))
         Hint(stringResource(R.string.device_reset_watermark_hint))
         Row {
-            TextButton(onClick = { viewModel.resetWatermark(device.address) }) { Text(stringResource(R.string.device_reset_watermark)) }
+            TextButton(onClick = { confirmReimport = true }) { Text(stringResource(R.string.device_reset_watermark)) }
             TextButton(onClick = { confirmForget = true }) { Text(stringResource(R.string.device_forget)) }
         }
+    }
+    if (confirmReimport) {
+        AlertDialog(
+            onDismissRequest = { confirmReimport = false },
+            title = { Text(stringResource(R.string.device_reset_watermark_title)) },
+            text = { Text(stringResource(R.string.device_reset_watermark_text)) },
+            confirmButton = {
+                TextButton(onClick = { confirmReimport = false; viewModel.resetWatermark(device.address) }) { Text(stringResource(R.string.device_reset_watermark)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmReimport = false }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
     if (confirmForget) {
         AlertDialog(

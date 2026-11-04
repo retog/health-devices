@@ -65,7 +65,7 @@ class Importer(private val context: Context, private val store: DeviceStore) {
         val manufacturer = outcome.manufacturer ?: device.manufacturer
         val model = outcome.model ?: device.model
 
-        val plan = ImportLogic.plan(outcome.frames, profile, device.clock, ZoneId.systemDefault(), receivedAt, device.watermark)
+        val plan = ImportLogic.plan(outcome.frames, profile, device.clock, ZoneId.systemDefault(), receivedAt, device.watermark, device.unstampedCounts)
         if (plan.toWrite.isEmpty()) {
             // Nothing new: an old reading re-sent, or nothing at all. The watermark cannot have moved.
             return finish(device, receivedAt, ImportResult(ReceptionResult.NO_DATA, detail = detail(plan)), frames)
@@ -110,9 +110,11 @@ class Importer(private val context: Context, private val store: DeviceStore) {
         }
 
         val done = (written + skipped).map { it.planned }
+        val notDone = failed.map { it.first.planned }
         store.updateDevice(device.address) { d ->
             d.copy(
-                watermark = ImportLogic.watermarkAfter(d.watermark, done),
+                watermark = ImportLogic.watermarkAfter(d.watermark, done, notDone),
+                unstampedCounts = ImportLogic.unstampedCountsAfter(d.unstampedCounts, done),
                 manufacturer = manufacturer,
                 model = model,
                 hasCurrentTimeService = outcome.hasCurrentTimeService || d.hasCurrentTimeService,
@@ -147,6 +149,7 @@ class Importer(private val context: Context, private val store: DeviceStore) {
     private fun detail(plan: ImportPlan): String? = buildList {
         if (plan.skippedOld > 0) add("${plan.skippedOld} already imported")
         if (plan.undecodable > 0) add("${plan.undecodable} undecodable")
+        if (plan.skippedSeen > 0) add("${plan.skippedSeen} unstamped, imported before")
     }.joinToString(", ").ifEmpty { null }
 
     private suspend fun finish(device: PairedDevice, at: Instant, result: ImportResult, frames: List<String>, summary: String? = null): ImportResult {

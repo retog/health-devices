@@ -22,6 +22,7 @@ class DeviceTimeTest {
         assertEquals(Instant.parse("2026-11-04T06:30:00Z"), t.instant)
         assertEquals(ZoneOffset.ofHours(1), t.offset)
         assertTrue(t.fromDevice)
+        assertEquals(DeviceTime.naiveSeconds(LocalDateTime.of(2026, 11, 4, 7, 30, 0)), t.deviceStamp)
     }
 
     @Test
@@ -46,6 +47,7 @@ class DeviceTimeTest {
         assertEquals(ZoneOffset.ofHours(1), t.offset)
         assertFalse(t.fromDevice)
         assertEquals(3, t.sequence)
+        assertEquals(null, t.deviceStamp)
     }
 
     @Test

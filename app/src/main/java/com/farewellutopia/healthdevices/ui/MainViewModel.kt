@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.farewellutopia.healthdevices.HealthDevicesApp
 import com.farewellutopia.healthdevices.ble.BackgroundScan
 import com.farewellutopia.healthdevices.ble.GattSession
 import com.farewellutopia.healthdevices.ble.ReadOutcome
@@ -261,6 +262,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         stopScan()
+        connectJob?.cancel()
+        // A pairing cut short (the activity went away for good) must not leave
+        // the background scan paused; the view model's own scope is gone, so
+        // the application's does it.
+        if (_pairing.value != Pairing.Idle) {
+            HealthDevicesApp.receiverScope.launch { if (store.devicesNow().isNotEmpty()) BackgroundScan.register(app, store) }
+        }
         super.onCleared()
     }
 

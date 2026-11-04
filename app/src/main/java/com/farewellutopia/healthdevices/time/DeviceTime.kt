@@ -26,7 +26,14 @@ enum class DeviceClock(val key: String) {
  * Receive-time readings of one reception share the instant, so each carries
  * its [sequence] within the reception to keep their record ids apart.
  */
-data class ResolvedTime(val instant: Instant, val offset: ZoneOffset, val fromDevice: Boolean, val sequence: Int = 0)
+data class ResolvedTime(
+    val instant: Instant,
+    val offset: ZoneOffset,
+    val fromDevice: Boolean,
+    val sequence: Int = 0,
+    /** The device's own stamp as [DeviceTime.naiveSeconds] when [fromDevice]; what the record id is made of. */
+    val deviceStamp: Long? = null,
+)
 
 /**
  * Turns the naive wall clock a device sends into an instant. The Blood
@@ -68,7 +75,7 @@ object DeviceTime {
         // In a summer-time overlap the earlier offset is taken; in a gap the time
         // is shifted forward by the gap, as ZonedDateTime.ofLocal does.
         val zoned = ZonedDateTime.ofLocal(deviceTime!!, zone, null)
-        return ResolvedTime(zoned.toInstant(), zoned.offset, fromDevice = true)
+        return ResolvedTime(zoned.toInstant(), zoned.offset, fromDevice = true, deviceStamp = naiveSeconds(deviceTime))
     }
 
     /**

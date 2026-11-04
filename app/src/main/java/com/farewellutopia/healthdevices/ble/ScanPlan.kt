@@ -58,6 +58,6 @@ object ScanPlan {
     fun needsRegistration(state: ScanState, addresses: Collection<String>, firstInProcess: Boolean): Boolean =
         firstInProcess || !state.registered || state.addresses.map { it.uppercase() }.toSet() != addresses.map { it.uppercase() }.toSet()
 
-    /** Whether a manual re-register is honoured now (always when nothing is registered). */
-    fun manualAllowed(state: ScanState, now: Long): Boolean = !state.registered || now - state.at >= MANUAL_INTERVAL_MS
+    /** Whether a manual re-register is honoured now: not within [MANUAL_INTERVAL_MS] of the last attempt, successful or not. */
+    fun manualAllowed(state: ScanState, now: Long): Boolean = now - state.at >= MANUAL_INTERVAL_MS
 }

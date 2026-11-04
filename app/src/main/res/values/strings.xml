@@ -106,7 +106,9 @@
     <string name="clock_local">Local time (the phone\'s zone)</string>
     <string name="clock_explanation">The device sends a time without a zone; it is read in this zone. A change applies to future readings only.</string>
     <string name="device_reset_watermark">Re-import everything</string>
-    <string name="device_reset_watermark_hint">Re-import writes everything the device still holds at the next reception; Health Connect keeps one record per reading.</string>
+    <string name="device_reset_watermark_hint">Re-import writes everything the device still holds at the next reception. Records are keyed by the device\'s own time stamp, so after a corrected clock setting the same readings are updated in place, not duplicated.</string>
+    <string name="device_reset_watermark_title">Re-import everything?</string>
+    <string name="device_reset_watermark_text">At the next reception every reading the device still holds is written to Health Connect again, updating the existing records (for instance after changing the clock setting). Nothing is deleted.</string>
     <string name="device_forget">Forget device</string>
     <string name="device_forget_title">Forget this device?</string>
     <string name="device_forget_text">The app stops reading it. The Bluetooth pairing itself stays until you remove the device in the system\'s Bluetooth settings.</string>

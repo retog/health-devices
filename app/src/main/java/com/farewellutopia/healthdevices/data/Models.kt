@@ -31,6 +31,14 @@ data class PairedDevice(
      * nobody there to answer, so the service skips it and says so.
      */
     val bonded: Boolean = true,
+    /**
+     * Readings without a usable time stamp that were imported, as frame hex
+     * → how many of that exact frame. The device re-sends its whole memory
+     * every time, and such readings carry nothing but their content to be
+     * recognised by, so only the occurrences beyond the stored count are new.
+     * A multiset, not a set: two identical readings are two readings.
+     */
+    val unstampedCounts: Map<String, Int> = emptyMap(),
     val pairedAt: Long,
 ) {
     /** What the UI calls the device. */
