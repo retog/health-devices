@@ -1,0 +1,15 @@
+<resources>
+    <!-- Compose renders the UI; this platform theme only governs the window shell
+         (no action bar). A values-night override supplies the dark variant. -->
+    <style name="Theme.HealthDevices" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- An invisible window under a Compose dialog (the Health Connect rationale). -->
+    <style name="Theme.HealthDevices.Translucent">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+</resources>
