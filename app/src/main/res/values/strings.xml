@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Health Devices</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="done">Done</string>
+    <string name="retry">Retry</string>
+    <string name="grant_permissions">Grant permissions</string>
+    <string name="version">Version %1$s</string>
+
+    <!-- Notification channels -->
+    <string name="channel_readings">Device readings</string>
+    <string name="channel_readings_description">Each reception from a paired device: what was read and written to Health Connect.</string>
+    <string name="channel_problems">Problems</string>
+    <string name="channel_problems_description">Something stops readings from arriving: permissions, Bluetooth, Health Connect.</string>
+
+    <!-- Notifications -->
+    <string name="notification_reading">Reading %1$s…</string>
+    <plurals name="notification_new_readings">
+        <item quantity="one">%d new reading</item>
+        <item quantity="other">%d new readings</item>
+    </plurals>
+    <string name="notification_receive_time">device clock not usable, time of reception used</string>
+    <string name="notification_nothing_new">Nothing new on the device.</string>
+    <string name="notification_connect_failed">Could not connect to the device. Take another measurement to retry.</string>
+    <string name="notification_service_missing">The device does not offer the expected Bluetooth service.</string>
+    <string name="notification_subscribe_failed">Could not subscribe to measurements. The pairing may be gone: check the system\'s Bluetooth settings or pair again.</string>
+    <string name="notification_hc_unavailable">Health Connect is not available on this phone, so the readings were not written.</string>
+    <string name="notification_hc_denied">Health Connect permissions are missing. Open the app to grant them.</string>
+    <string name="notification_hc_error">Health Connect refused the readings. Open the app for details.</string>
+    <string name="notification_bluetooth_off">Bluetooth is off, so the device could not be read.</string>
+    <string name="notification_no_permission">Bluetooth permissions are missing. Open the app to grant them.</string>
+    <string name="problem_scan_failed">The background scan stopped. Open the app to register it again.</string>
+    <string name="problem_scan_not_registered">The background scan could not be registered. Open the app to see why.</string>
+    <string name="problem_service_not_allowed">Android did not allow reading in the background. Open the app once; then try another measurement.</string>
+    <string name="problem_no_permission">Bluetooth permissions are missing, so the device could not be read. Open the app to grant them.</string>
+
+    <!-- Measurement status notes -->
+    <string name="note_irregular_pulse">irregular pulse detected</string>
+    <string name="note_body_movement">body movement during measurement</string>
+    <string name="note_cuff_loose">cuff too loose</string>
+    <string name="note_improper_position">improper measurement position</string>
+    <string name="note_pulse_out_of_range">pulse outside the device\'s range</string>
+
+    <!-- Blood pressure -->
+    <string name="bp_summary">%1$d/%2$d mmHg, pulse %3$d</string>
+    <string name="bp_summary_no_pulse">%1$d/%2$d mmHg</string>
+    <string name="bp_summary_invalid">reading without valid pressures</string>
+
+    <!-- Health Connect rationale -->
+    <string name="rationale_title">Why Health Devices writes health data</string>
+    <string name="rationale_text">Readings from your Bluetooth device (blood pressure and pulse) are written to Health Connect so other apps you allow can see them. Nothing leaves the phone: the app has no network access.</string>
+
+    <!-- Status screen -->
+    <string name="section_health_connect">Health Connect</string>
+    <string name="section_bluetooth">Bluetooth and notifications</string>
+    <string name="section_background">Background reception</string>
+    <string name="section_battery">Battery optimisation</string>
+    <string name="section_devices">Devices</string>
+    <string name="section_receptions">Last receptions</string>
+    <string name="hc_available_granted">Available, write permissions granted.</string>
+    <string name="hc_available_missing">Available, but write permissions are missing.</string>
+    <string name="hc_not_installed">Health Connect is not available. On Android 12 and 13 the Health Connect app must be installed; from Android 14 it is part of the system.</string>
+    <string name="hc_update_required">The Health Connect app needs an update before this app can use it.</string>
+    <string name="hc_open_permissions">Open Health Connect permissions</string>
+    <string name="bt_permissions_ok">Nearby-devices permissions granted.</string>
+    <string name="bt_permissions_missing">Nearby-devices permissions missing (scan and connect).</string>
+    <string name="bt_on">Bluetooth is on.</string>
+    <string name="bt_off">Bluetooth is off.</string>
+    <string name="notifications_ok">Notifications allowed.</string>
+    <string name="notifications_missing">Notifications not allowed: you will not see what was read.</string>
+    <string name="scan_registered">Scan registered (%1$s).</string>
+    <string name="scan_registered_all_matches">Scan registered (%1$s); this phone reports every advertisement, so a device may be contacted more than once.</string>
+    <string name="scan_never">Scan not registered yet.</string>
+    <string name="scan_problem_no_permission">Scan not registered: permissions missing.</string>
+    <string name="scan_problem_bluetooth_off">Scan not registered: Bluetooth is off. It registers itself when Bluetooth turns on.</string>
+    <string name="scan_problem_no_devices">Scan not registered: no paired device.</string>
+    <string name="scan_problem_failed">Scan not registered: the scanner refused (code %1$d).</string>
+    <string name="scan_explanation">The system wakes the app when a paired device advertises after a measurement. It is registered again on boot, when Bluetooth turns on, and whenever this screen opens. After a force-stop (or Samsung\'s "sleeping apps") nothing wakes the app until it is opened again.</string>
+    <string name="scan_reregister">Re-register scan</string>
+    <string name="battery_exempt">Exempt from battery optimisation.</string>
+    <string name="battery_not_exempt">Not exempt from battery optimisation.</string>
+    <string name="battery_explanation">Some phones (Samsung in particular) stop background work of apps that are not exempt. Find Health Devices in the list and allow it.</string>
+    <string name="battery_open">Open battery optimisation settings</string>
+    <string name="device_address">Address %1$s</string>
+    <string name="device_make">%1$s</string>
+    <string name="device_cts_yes">Offers the Current Time Service (not used yet).</string>
+    <string name="device_cts_no">No Current Time Service.</string>
+    <string name="device_watermark">Imported up to the device time %1$s.</string>
+    <string name="device_watermark_all">Imports everything the device holds.</string>
+    <string name="device_clock_label">Device clock is set to</string>
+    <string name="clock_utc">UTC</string>
+    <string name="clock_local">Local time (the phone\'s zone)</string>
+    <string name="clock_explanation">The device sends a time without a zone; it is read in this zone. A change applies to future readings only.</string>
+    <string name="device_forget">Forget device</string>
+    <string name="device_forget_title">Forget this device?</string>
+    <string name="device_forget_text">The app stops reading it. The Bluetooth pairing itself stays until you remove the device in the system\'s Bluetooth settings.</string>
+    <string name="add_device">Add device</string>
+    <string name="receptions_empty">Nothing received yet.</string>
+    <string name="result_ok">Written to Health Connect</string>
+    <string name="result_no_data">Nothing new</string>
+    <string name="result_connect_failed">Connection failed</string>
+    <string name="result_service_missing">Service not found on the device</string>
+    <string name="result_subscribe_failed">Subscription failed</string>
+    <string name="result_timeout">Timed out</string>
+    <string name="result_hc_unavailable">Health Connect not available</string>
+    <string name="result_hc_denied">Health Connect permissions missing</string>
+    <string name="result_hc_error">Health Connect refused the write</string>
+    <string name="result_bluetooth_off">Bluetooth off</string>
+    <string name="result_no_permission">Permissions missing</string>
+
+    <!-- Pairing -->
+    <string name="pairing_title">Pair a device</string>
+    <string name="pairing_prereq_bt">Scanning and connecting need the nearby-devices permissions.</string>
+    <string name="pairing_prereq_hc">Health Connect write permissions are needed before readings can be imported.</string>
+    <string name="pairing_intro">Take a measurement now: a blood pressure monitor advertises for about half a minute after each measurement. Then start the scan and tap the device when it appears.</string>
+    <string name="pairing_scan">Scan</string>
+    <string name="pairing_stop">Stop</string>
+    <string name="pairing_scanning">Scanning…</string>
+    <string name="pairing_no_devices_yet">No device yet. If the measurement was a while ago, take another one.</string>
+    <string name="pairing_unknown_device">Unnamed device</string>
+    <string name="pairing_error_no_permission">Cannot scan: permissions missing.</string>
+    <string name="pairing_error_bluetooth_off">Cannot scan: Bluetooth is off.</string>
+    <string name="pairing_error_scan">Scan failed (code %1$d).</string>
+    <string name="pairing_connecting">Connecting to %1$s…</string>
+    <string name="pairing_connecting_hint">If the phone asks for a pairing code, enter the one the device shows. The device sends its stored readings now; that may take a few seconds.</string>
+    <string name="pairing_connected">Connected to %1$s.</string>
+    <plurals name="pairing_readings_received">
+        <item quantity="one">%d reading received from the device.</item>
+        <item quantity="other">%d readings received from the device.</item>
+    </plurals>
+    <string name="pairing_import_title">Readings already on the device</string>
+    <string name="pairing_import_existing">Import them into Health Connect now</string>
+    <string name="pairing_import_new_only">Only new readings from now on</string>
+    <string name="pairing_finish">Finish</string>
+    <string name="pairing_failed">Could not read %1$s.</string>
+    <string name="pairing_failed_connect">The connection failed (status %1$d). Take another measurement so the device advertises, then retry.</string>
+    <string name="pairing_failed_service">The device does not offer a supported service.</string>
+    <string name="pairing_failed_subscribe">Subscribing to measurements failed (status %1$d). If a pairing dialog was dismissed, retry and accept it.</string>
+    <string name="pairing_failed_timeout">The device did not answer in time. Take another measurement, then retry.</string>
+    <string name="pairing_finished">%1$s is paired. New measurements arrive in the background from now on.</string>
+    <string name="pairing_not_imported">The readings on the device were left alone; only newer ones will be imported.</string>
+</resources>
