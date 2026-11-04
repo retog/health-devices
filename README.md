@@ -138,12 +138,55 @@ Connect client 1.1.0-beta01 (the same toolchain as `retinue-os/ara-android`).
 
 CI (`.github/workflows/ci.yml`) assembles the debug APK and runs the unit
 tests on every pull request and push to `main`; the APK is attached to the
-run. The nightly workflow publishes a release APK as a GitHub pre-release
-tagged `nightly-YYYY-MM-DD`. Both are signed with the checked-in **test
-certificate** (`keystore/README.md`), so any build installs over the previous
-one. Install from the [releases page](../../releases) or with
+run. It is signed with the runner's debug key, so to install it over a
+nightly build (or an earlier branch APK) uninstall that build first.
+
+## Nightly builds
+
+`.github/workflows/nightly.yml` builds a release APK every night at 02:30
+UTC if `main` changed since the last successful run, and publishes it as a
+pre-release tagged `nightly-YYYY-MM-DD`. Runs started by hand (Actions →
+Nightly APK build → Run workflow) are tagged `nightly-YYYY-MM-DD-X1`, `-X2`,
+… for that day. Install from the [releases page](../../releases) or with
 [Obtainium](https://github.com/ImranR98/Obtainium) pointed at this
 repository (enable pre-releases).
+
+Nightly APKs are signed with the nightly key, so each installs over the
+previous one. To install one over a build signed with a different key,
+uninstall that build first.
+
+The key is not in the repository but in two repository secrets; until they
+are set, the workflow stops with an error. To create them once:
+
+```bash
+keytool -genkeypair -keystore nightly.jks -storetype PKCS12 -alias health-devices-nightly \
+  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Health Devices Nightly"
+base64 < nightly.jks | gh secret set NIGHTLY_KEYSTORE_BASE64
+gh secret set NIGHTLY_KEYSTORE_PASSWORD   # the password keytool asked for
+```
+
+Without Java, OpenSSL (or macOS's LibreSSL) makes an equivalent keystore:
+
+```bash
+openssl req -x509 -newkey rsa:4096 -sha256 -days 10000 -nodes \
+  -subj "/CN=Health Devices Nightly" -keyout key.pem -out cert.pem
+openssl pkcs12 -export -inkey key.pem -in cert.pem -name health-devices-nightly -out nightly.jks
+rm key.pem cert.pem
+```
+
+Keep `nightly.jks` and its password somewhere safe outside the repository:
+a nightly signed with a new key does not install over the earlier ones.
+
+The workflow finds the key's alias by itself: it uses the repository
+variable `NIGHTLY_KEY_ALIAS` when that is set (`gh variable set
+NIGHTLY_KEY_ALIAS`), otherwise the keystore's only private key (`keytool
+-list`). A keystore with several private keys needs the variable.
+
+To sign a build locally as the workflow does, set `NIGHTLY_KEYSTORE_FILE`
+(the path of `nightly.jks`), `NIGHTLY_KEYSTORE_PASSWORD` and
+`NIGHTLY_KEY_ALIAS` (the alias above, e.g. `health-devices-nightly`), then
+run `./gradlew assembleRelease -Pnightly`. Without `-Pnightly` a release
+build stays unsigned.
 
 ## Architecture
 

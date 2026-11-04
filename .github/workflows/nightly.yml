@@ -22,6 +22,17 @@ jobs:
       should_build: ${{ steps.decide.outputs.should_build }}
       tag: ${{ steps.decide.outputs.tag }}
     steps:
+      # The signing key is kept in repository secrets; see "Nightly builds" in README.md.
+      - name: Check for the signing key
+        env:
+          NIGHTLY_KEYSTORE_BASE64: ${{ secrets.NIGHTLY_KEYSTORE_BASE64 }}
+          NIGHTLY_KEYSTORE_PASSWORD: ${{ secrets.NIGHTLY_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$NIGHTLY_KEYSTORE_BASE64" ] || [ -z "$NIGHTLY_KEYSTORE_PASSWORD" ]; then
+            echo "::error::The secrets NIGHTLY_KEYSTORE_BASE64 and NIGHTLY_KEYSTORE_PASSWORD are not set; see \"Nightly builds\" in README.md."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -77,11 +88,52 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # The commit and the tag go into BuildConfig and the version shown on the
-      # status screen.
-      - name: Build release APK
-        run: ./gradlew --no-daemon assembleRelease
+      - name: Decode the signing key
         env:
+          NIGHTLY_KEYSTORE_BASE64: ${{ secrets.NIGHTLY_KEYSTORE_BASE64 }}
+        run: base64 --decode <<< "$NIGHTLY_KEYSTORE_BASE64" > "$RUNNER_TEMP/nightly.jks"
+
+      # The alias of the key to sign with: the repository variable NIGHTLY_KEY_ALIAS
+      # when it is set, otherwise the keystore's only private key. keytool reads the
+      # password from the environment, so it is neither on a command line nor in the
+      # log; the listing is kept out of the log too.
+      - name: Resolve the key alias
+        id: alias
+        env:
+          NIGHTLY_KEY_ALIAS: ${{ vars.NIGHTLY_KEY_ALIAS }}
+          NIGHTLY_KEYSTORE_PASSWORD: ${{ secrets.NIGHTLY_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          alias="$NIGHTLY_KEY_ALIAS"
+          if [ -z "$alias" ]; then
+            if ! listing=$(keytool -list -v -keystore "$RUNNER_TEMP/nightly.jks" -storepass:env NIGHTLY_KEYSTORE_PASSWORD 2>&1); then
+              echo "$listing" >&2
+              echo "::error::keytool cannot read the keystore in NIGHTLY_KEYSTORE_BASE64 with NIGHTLY_KEYSTORE_PASSWORD; see \"Nightly builds\" in README.md."
+              exit 1
+            fi
+            # keytool -list -v prints "Alias name: <alias>" followed, a few lines on, by
+            # "Entry type: PrivateKeyEntry" for each key.
+            mapfile -t aliases < <(awk '/^Alias name: /{ a = substr($0, 13) } /^Entry type: PrivateKeyEntry/{ print a }' <<< "$listing")
+            case "${#aliases[@]}" in
+              1) alias="${aliases[0]}" ;;
+              0) echo "::error::The keystore in NIGHTLY_KEYSTORE_BASE64 holds no private key; see \"Nightly builds\" in README.md."
+                 exit 1 ;;
+              *) echo "::error::The keystore in NIGHTLY_KEYSTORE_BASE64 holds ${#aliases[@]} private keys (${aliases[*]}); set the repository variable NIGHTLY_KEY_ALIAS to the one to sign with."
+                 exit 1 ;;
+            esac
+          fi
+          echo "Signing with key alias: $alias"
+          echo "alias=$alias" >> "$GITHUB_OUTPUT"
+
+      # -Pnightly signs the APK with the nightly key (see "Nightly builds" in
+      # README.md). The commit and the tag go into BuildConfig and the version
+      # shown on the status screen.
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease -Pnightly
+        env:
+          NIGHTLY_KEYSTORE_FILE: ${{ runner.temp }}/nightly.jks
+          NIGHTLY_KEYSTORE_PASSWORD: ${{ secrets.NIGHTLY_KEYSTORE_PASSWORD }}
+          NIGHTLY_KEY_ALIAS: ${{ steps.alias.outputs.alias }}
           HEALTH_DEVICES_BUILD_SHA: ${{ github.sha }}
           HEALTH_DEVICES_BUILD_TAG: ${{ needs.check.outputs.tag }}
 
