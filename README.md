@@ -156,22 +156,30 @@ previous one. To install one over a build signed with a different key,
 uninstall that build first.
 
 The key is not in the repository but in two repository secrets; until they
-are set, the workflow stops with an error. To create them once:
+are set, the workflow stops with an error. Create the keystore once, with
+Java's `keytool`:
 
 ```bash
 keytool -genkeypair -keystore nightly.jks -storetype PKCS12 -alias health-devices-nightly \
   -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Health Devices Nightly"
-base64 < nightly.jks | gh secret set NIGHTLY_KEYSTORE_BASE64
-gh secret set NIGHTLY_KEYSTORE_PASSWORD   # the password keytool asked for
 ```
 
-Without Java, OpenSSL (or macOS's LibreSSL) makes an equivalent keystore:
+or, without Java, with OpenSSL (or macOS's LibreSSL), which makes an
+equivalent keystore:
 
 ```bash
 openssl req -x509 -newkey rsa:4096 -sha256 -days 10000 -nodes \
   -subj "/CN=Health Devices Nightly" -keyout key.pem -out cert.pem
 openssl pkcs12 -export -inkey key.pem -in cert.pem -name health-devices-nightly -out nightly.jks
 rm key.pem cert.pem
+```
+
+Then put the keystore and its password (the one `keytool` or `openssl`
+asked for) into the two secrets:
+
+```bash
+base64 < nightly.jks | gh secret set NIGHTLY_KEYSTORE_BASE64
+gh secret set NIGHTLY_KEYSTORE_PASSWORD
 ```
 
 Keep `nightly.jks` and its password somewhere safe outside the repository:
